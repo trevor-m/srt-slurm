@@ -151,7 +151,7 @@ backend:
 
       # Request handling
       max-running-requests: 67584
-      enable-single-batch-overlap: true
+      enable-single-batch-overlap: false
 
       # DeepEP configuration
       moe-a2a-backend: "deepep"

@@ -126,7 +126,7 @@ backend:
 
       # Quantization
       quantization: "modelopt_fp4"
-      moe-runner-backend: "flashinfer_cutedsl"
+      moe-runner-backend: "flashinfer_trtllm_routed"
 
       # Radix cache disabled
       disable-radix-cache: true
@@ -151,12 +151,12 @@ backend:
 
       # Request handling
       max-running-requests: 67584
-      enable-single-batch-overlap: true
+      #enable-single-batch-overlap: true
 
       # DeepEP configuration
-      moe-a2a-backend: "deepep"
-      deepep-mode: "low_latency"
-      ep-dispatch-algorithm: "static"
+      moe-a2a-backend: "flashinfer"
+      #deepep-mode: "low_latency"
+      #ep-dispatch-algorithm: "static"
       #ep-num-redundant-experts: 32
 
       # CUDA graphs (extensive batch size list)
