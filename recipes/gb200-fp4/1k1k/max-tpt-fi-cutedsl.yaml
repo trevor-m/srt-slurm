@@ -126,7 +126,7 @@ backend:
 
       # Quantization
       quantization: "modelopt_fp4"
-      moe-runner-backend: "flashinfer_trtllm_routed"
+      moe-runner-backend: "flashinfer_cutedsl"
 
       # Radix cache disabled
       disable-radix-cache: true
@@ -145,12 +145,12 @@ backend:
       disaggregation-mode: "decode"
 
       # Memory and token limits
-      mem-fraction-static: 0.83
+      mem-fraction-static: 0.70
       max-total-tokens: 3122380
       chunked-prefill-size: 786432
 
       # Request handling
-      max-running-requests: 67584
+      max-running-requests: 32768
       #enable-single-batch-overlap: true
 
       # DeepEP configuration
