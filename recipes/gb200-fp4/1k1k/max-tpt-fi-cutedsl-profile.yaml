@@ -104,7 +104,7 @@ backend:
 
       # Request handling
       max-running-requests: 30000
-      load-balance-method: "round_robin"
+      load-balance-method: "follow_bootstrap_room"
 
       # Performance optimizations
       disable-cuda-graph: true
