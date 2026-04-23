@@ -99,14 +99,20 @@ IFS='x' read -r -a CONCURRENCY_LIST <<< "$CONCURRENCIES"
 
 # Quick curl to verify endpoint is working
 echo "Verifying endpoint..."
-curl -s "${ENDPOINT}/v1/chat/completions" \
+verify_response=$(curl -sS --max-time 30 -f "${ENDPOINT}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -d "{
         \"model\": \"${MODEL_NAME}\",
         \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}],
         \"stream\": false,
         \"max_tokens\": 10
-    }" | head -c 200
+    }") || {
+    rc=$?
+    echo ""
+    echo "ERROR: endpoint verification failed (curl exit=$rc)"
+    exit 1
+}
+echo "${verify_response}" | head -c 2000
 echo ""
 
 ulimit -n 65536 2>/dev/null || true  # May fail in containers without CAP_SYS_RESOURCE

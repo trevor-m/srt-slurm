@@ -89,6 +89,8 @@ backend:
       disable-shared-experts-fusion: true
       eplb-algorithm: "deepseek"
       disaggregation-bootstrap-port: 30001
+      log-requests: true
+      log-requests-level: 2
 
       # Prefill-specific mode
       disaggregation-mode: "prefill"
@@ -140,6 +142,8 @@ backend:
       disable-shared-experts-fusion: true
       eplb-algorithm: "deepseek"
       disaggregation-bootstrap-port: 30001
+      log-requests: true
+      log-requests-level: 2
 
       # Decode-specific mode
       disaggregation-mode: "decode"
