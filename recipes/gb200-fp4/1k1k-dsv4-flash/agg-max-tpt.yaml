@@ -54,3 +54,4 @@ benchmark:
   random_range_ratio: 0.8
   concurrencies: "64x128x256"
   req_rate: "inf"
+  use_chat_template: false
