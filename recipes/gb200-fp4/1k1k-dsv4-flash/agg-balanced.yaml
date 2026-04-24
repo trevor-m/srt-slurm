@@ -46,8 +46,6 @@ backend:
       mem-fraction-static: 0.9
       context-length: 2200
       max-prefill-tokens: 4096
-      cuda-graph-max-bs: 64
-      max-running-requests: 64
       disable-radix-cache: true
       decode-log-interval: 1
       stream-interval: 50
@@ -57,6 +55,6 @@ benchmark:
   isl: 1024
   osl: 1024
   random_range_ratio: 0.8
-  concurrencies: "32x64"
+  concurrencies: "32x64x128x256x512"
   req_rate: "inf"
   use_chat_template: false

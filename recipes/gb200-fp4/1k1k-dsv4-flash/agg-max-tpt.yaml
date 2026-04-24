@@ -38,11 +38,9 @@ backend:
       moe-a2a-backend: "deepep"
       deepep-config: '{"normal_dispatch":{"num_sms":96},"normal_combine":{"num_sms":96}}'
 
-      mem-fraction-static: 0.9
+      mem-fraction-static: 0.85
       context-length: 2200
       max-prefill-tokens: 4096
-      cuda-graph-max-bs: 256
-      max-running-requests: 256
       disable-radix-cache: true
       decode-log-interval: 1
       stream-interval: 50
@@ -52,6 +50,6 @@ benchmark:
   isl: 1024
   osl: 1024
   random_range_ratio: 0.8
-  concurrencies: "64x128x256"
+  concurrencies: "64x128x256x512"
   req_rate: "inf"
   use_chat_template: false
