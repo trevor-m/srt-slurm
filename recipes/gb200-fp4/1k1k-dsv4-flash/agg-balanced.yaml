@@ -1,0 +1,61 @@
+# DeepSeek-V4-Flash aggregated on GB200
+name: "dsv4-flash-gb200-agg-balanced-1k1k"
+
+model:
+  path: "dsv4-flash"
+  container: "dsv4-grace-blackwell"
+  precision: "fp4"
+
+frontend:
+  type: sglang
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_JIT_DEEPGEMM_FAST_WARMUP: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+
+  sglang_config:
+    aggregated:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Flash"
+      model-path: "/model/"
+      trust-remote-code: true
+
+      tensor-parallel-size: 4
+      data-parallel-size: 4
+      enable-dp-attention: true
+      moe-a2a-backend: "deepep"
+      deepep-config: '{"normal_dispatch":{"num_sms":96},"normal_combine":{"num_sms":96}}'
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 1
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 2
+
+      mem-fraction-static: 0.9
+      context-length: 2200
+      max-prefill-tokens: 4096
+      cuda-graph-max-bs: 64
+      max-running-requests: 64
+      disable-radix-cache: true
+      decode-log-interval: 1
+      stream-interval: 50
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  random_range_ratio: 0.8
+  concurrencies: "32x64"
+  req_rate: "inf"
