@@ -1,0 +1,102 @@
+# DeepSeek-V4-Pro disaggregated 1P1D on GB300 — TP=4, MXFP4, EAGLE MTP — sa-bench.
+#
+# Quick smoke-test sibling of disagg-1p1d-tp4-mtp-gpqa.yaml — same model,
+# topology, parallelism, MTP, env vars, and KV transfer; only the benchmark
+# differs. Use this first to confirm disagg + MTP plumbing serves traffic at
+# all (sa-bench hits /v1/completions and is forgiving of timeouts), then run
+# the GPQA recipe for accuracy.
+#
+# See the GPQA sibling header for the rationale on Mooncake (NIXL bug) and
+# sglang frontend (no jinja chat_template).
+name: "dsv4-pro-gb300-disagg-1p1d-tp4-mtp-sa"
+
+slurm:
+  partition: gb300
+  time_limit: "2:00:00"
+
+frontend:
+  type: sglang
+
+model:
+  path: "dsv4-pro"
+  container: "dsv4-grace-blackwell"
+  precision: "mxfp4"
+
+resources:
+  gpu_type: "gb300"
+  prefill_nodes: 1
+  decode_nodes: 1
+  prefill_workers: 1
+  decode_workers: 1
+  gpus_per_node: 4
+
+backend:
+  type: sglang
+
+  prefill_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+
+  decode_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+
+  sglang_config:
+    prefill:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+
+      disaggregation-mode: "prefill"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      mem-fraction-static: 0.80
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+    decode:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+
+      disaggregation-mode: "decode"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      mem-fraction-static: 0.80
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  random_range_ratio: 0.8
+  # Smoke-test sweep: low/mid/sat in <5 min total once workers are up.
+  concurrencies: "1x8x32"
+  req_rate: "inf"
+  # DSv4-Pro has no jinja chat_template; sa-bench works against /v1/completions
+  # with random tokens. (See agg-low-latency-chat.yaml for the
+  # custom_tokenizer-based path if you want chat-templated prompts.)
+  use_chat_template: false

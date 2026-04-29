@@ -11,6 +11,14 @@
 # a NIXL aux-buffer bug that silently collapses DSv4-Pro accuracy
 # (GSM8K ≈ 0.13 vs 1.00) until the upstream patch lands. Mooncake registers
 # the aux buffers correctly today.
+#
+# sglang frontend (not dynamo): DSv4-Pro deliberately ships with no jinja
+# chat_template — its prompt rendering lives in sglang's Python encoder
+# (sgl-project/sglang PR #23600, chat_encoding_spec="dsv4"). dynamo's
+# PromptFormatter.from_mdc requires a jinja chat_template and refuses to
+# register the model, so all OpenAI endpoints return 404 and benchmarks
+# score 0. sglang_router knows the dsv4 encoder; matches the precedent in
+# agg-low-latency-chat.yaml.
 name: "dsv4-pro-gb300-disagg-1p1d-tp4-mtp-gpqa"
 
 slurm:
@@ -18,8 +26,7 @@ slurm:
   time_limit: "4:00:00"
 
 frontend:
-  type: dynamo
-  nginx_container: nginx
+  type: sglang
 
 model:
   path: "dsv4-pro"

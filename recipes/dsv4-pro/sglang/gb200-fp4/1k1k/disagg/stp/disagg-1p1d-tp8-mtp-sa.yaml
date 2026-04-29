@@ -1,25 +1,18 @@
 # DeepSeek-V4-Pro disaggregated 1P1D on GB200 — TP=8 (2 nodes/worker), MXFP4,
-# EAGLE MTP — GPQA accuracy.
+# EAGLE MTP — sa-bench.
 #
-# GB200 sibling of recipes/dsv4-pro/sglang/gb300-fp4/1k1k/disagg/stp/disagg-1p1d-tp4-mtp-gpqa.yaml.
-# GB200 HBM per GPU is smaller than GB300 — the 1.6T MXFP4 checkpoint only fits
-# across 2 nodes (8 GPUs) at TP=8 (same constraint as the sibling
-# recipes/gb200-fp4/1k1k-dsv4/agg-2n-low-latency.yaml). 1P + 1D = 4 nodes / 16
-# GPUs total.
+# Quick smoke-test sibling of disagg-1p1d-tp8-mtp-gpqa.yaml — same model,
+# topology, parallelism, MTP, env vars, and KV transfer; only the benchmark
+# differs. Use this first to confirm disagg + MTP plumbing serves traffic
+# at all on the 4-node GB200 shape, then run the GPQA recipe for accuracy.
 #
-# Mooncake KV transfer (not NIXL) — same DSv4-Pro aux-buffer rationale as the
-# GB300 sibling. Decode is multi-node, so SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2
-# is intentionally NOT set anywhere — CAR_V2 is single-node-only and corrupts
-# results across nodes.
-#
-# sglang frontend (not dynamo): DSv4-Pro has no jinja chat_template — see the
-# GB300 sibling header for the full rationale. dynamo would refuse to register
-# the model and every benchmark would score 0.
-name: "dsv4-pro-gb200-disagg-1p1d-tp8-mtp-gpqa"
+# See the GPQA sibling header for the rationale on Mooncake (NIXL bug) and
+# sglang frontend (no jinja chat_template).
+name: "dsv4-pro-gb200-disagg-1p1d-tp8-mtp-sa"
 
 slurm:
   #partition: gb200
-  time_limit: "4:00:00"
+  time_limit: "2:00:00"
 
 frontend:
   type: sglang
@@ -43,14 +36,10 @@ backend:
   prefill_environment:
     PYTHONUNBUFFERED: "1"
     SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
-    SGLANG_ENABLE_THINKING: "1"
-    SGLANG_REASONING_EFFORT: "max"
 
   decode_environment:
     PYTHONUNBUFFERED: "1"
     SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
-    SGLANG_ENABLE_THINKING: "1"
-    SGLANG_REASONING_EFFORT: "max"
 
   sglang_config:
     prefill:
@@ -66,10 +55,6 @@ backend:
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
 
-      # context-length must exceed benchmark.max_tokens (65536).
-      context-length: 73728
-      # Tighter than GB300 (0.80) — agg-2n-low-latency.yaml uses 0.82 without
-      # the MTP+long-context overhead, so 0.78 leaves headroom.
       mem-fraction-static: 0.78
       max-running-requests: 128
       cuda-graph-max-bs: 128
@@ -94,7 +79,6 @@ backend:
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
 
-      context-length: 73728
       mem-fraction-static: 0.78
       max-running-requests: 128
       cuda-graph-max-bs: 128
@@ -107,8 +91,10 @@ backend:
       speculative-num-draft-tokens: 4
 
 benchmark:
-  type: "gpqa"
-  num_examples: 198
-  max_tokens: 65536
-  repeat: 8
-  num_threads: 128
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  random_range_ratio: 0.8
+  concurrencies: "1x8x32"
+  req_rate: "inf"
+  use_chat_template: false
