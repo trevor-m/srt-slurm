@@ -1,0 +1,109 @@
+# DeepSeek-V4-Pro disaggregated 1P1D on GB300 — TP=4, MXFP4, EAGLE MTP — GPQA.
+#
+# Verification recipe for disagg + MTP correctness on DSv4-Pro. Sizing (1P1D,
+# both sides TP=4) starts from elvischenv's 8k1k low-latency config
+# (Slack #collab-nv-optimizations "GB300 8k1k low latency", 2026-04-29 — TP4
+# variant hit ~11.95 ms TPOT @ conc=1). MTP knobs come from the sibling
+# `agg-low-latency.yaml` (DSv4 cookbook EAGLE 3/4); benchmark is GPQA per
+# docs/accuracy.md.
+#
+# Mooncake KV transfer is intentional: the README in this directory documents
+# a NIXL aux-buffer bug that silently collapses DSv4-Pro accuracy
+# (GSM8K ≈ 0.13 vs 1.00) until the upstream patch lands. Mooncake registers
+# the aux buffers correctly today.
+name: "dsv4-pro-gb300-disagg-1p1d-tp4-mtp-gpqa"
+
+slurm:
+  partition: gb300
+  time_limit: "4:00:00"
+
+frontend:
+  type: dynamo
+  nginx_container: nginx
+
+model:
+  path: "dsv4-pro"
+  container: "dsv4-grace-blackwell"
+  precision: "mxfp4"
+
+resources:
+  gpu_type: "gb300"
+  prefill_nodes: 1
+  decode_nodes: 1
+  prefill_workers: 1
+  decode_workers: 1
+  gpus_per_node: 4
+
+backend:
+  type: sglang
+
+  prefill_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    # Reasoning-mode required for DSv4-Pro accuracy runs (docs/accuracy.md).
+    SGLANG_ENABLE_THINKING: "1"
+    SGLANG_REASONING_EFFORT: "max"
+
+  decode_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_ENABLE_THINKING: "1"
+    SGLANG_REASONING_EFFORT: "max"
+
+  sglang_config:
+    prefill:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+
+      disaggregation-mode: "prefill"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      # context-length must exceed benchmark.max_tokens (65536).
+      context-length: 73728
+      mem-fraction-static: 0.80
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      # EAGLE MTP — DSv4 cookbook 3/4 schedule (matches agg-low-latency.yaml).
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+    decode:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+
+      disaggregation-mode: "decode"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      context-length: 73728
+      mem-fraction-static: 0.80
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+benchmark:
+  type: "gpqa"
+  num_examples: 198
+  max_tokens: 65536
+  repeat: 8
+  num_threads: 128
