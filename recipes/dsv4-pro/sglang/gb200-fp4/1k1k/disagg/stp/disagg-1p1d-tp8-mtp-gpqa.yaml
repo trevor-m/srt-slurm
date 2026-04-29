@@ -14,7 +14,7 @@
 name: "dsv4-pro-gb200-disagg-1p1d-tp8-mtp-gpqa"
 
 slurm:
-  partition: gb200
+  #partition: gb200
   time_limit: "4:00:00"
 
 frontend:
@@ -58,6 +58,7 @@ backend:
 
       disaggregation-mode: "prefill"
       disaggregation-transfer-backend: mooncake
+      disaggregation-bootstrap-port: 30001
 
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
@@ -85,6 +86,7 @@ backend:
 
       disaggregation-mode: "decode"
       disaggregation-transfer-backend: mooncake
+      disaggregation-bootstrap-port: 30001
 
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
