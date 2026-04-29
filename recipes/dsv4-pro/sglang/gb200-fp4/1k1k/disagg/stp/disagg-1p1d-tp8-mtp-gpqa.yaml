@@ -1,0 +1,109 @@
+# DeepSeek-V4-Pro disaggregated 1P1D on GB200 — TP=8 (2 nodes/worker), MXFP4,
+# EAGLE MTP — GPQA accuracy.
+#
+# GB200 sibling of recipes/dsv4-pro/sglang/gb300-fp4/1k1k/disagg/stp/disagg-1p1d-tp4-mtp-gpqa.yaml.
+# GB200 HBM per GPU is smaller than GB300 — the 1.6T MXFP4 checkpoint only fits
+# across 2 nodes (8 GPUs) at TP=8 (same constraint as the sibling
+# recipes/gb200-fp4/1k1k-dsv4/agg-2n-low-latency.yaml). 1P + 1D = 4 nodes / 16
+# GPUs total.
+#
+# Mooncake KV transfer (not NIXL) — same DSv4-Pro aux-buffer rationale as the
+# GB300 sibling. Decode is multi-node, so SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2
+# is intentionally NOT set anywhere — CAR_V2 is single-node-only and corrupts
+# results across nodes.
+name: "dsv4-pro-gb200-disagg-1p1d-tp8-mtp-gpqa"
+
+slurm:
+  partition: gb200
+  time_limit: "4:00:00"
+
+frontend:
+  type: dynamo
+  nginx_container: nginx
+
+model:
+  path: "dsv4-pro"
+  container: "dsv4-grace-blackwell"
+  precision: "mxfp4"
+
+resources:
+  gpu_type: "gb200"
+  prefill_nodes: 2
+  decode_nodes: 2
+  prefill_workers: 1
+  decode_workers: 1
+  gpus_per_node: 4
+
+backend:
+  type: sglang
+
+  prefill_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_ENABLE_THINKING: "1"
+    SGLANG_REASONING_EFFORT: "max"
+
+  decode_environment:
+    PYTHONUNBUFFERED: "1"
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_ENABLE_THINKING: "1"
+    SGLANG_REASONING_EFFORT: "max"
+
+  sglang_config:
+    prefill:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 8
+
+      disaggregation-mode: "prefill"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      # context-length must exceed benchmark.max_tokens (65536).
+      context-length: 73728
+      # Tighter than GB300 (0.80) — agg-2n-low-latency.yaml uses 0.82 without
+      # the MTP+long-context overhead, so 0.78 leaves headroom.
+      mem-fraction-static: 0.78
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+    decode:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 8
+
+      disaggregation-mode: "decode"
+      disaggregation-transfer-backend: mooncake
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      context-length: 73728
+      mem-fraction-static: 0.78
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      disable-radix-cache: true
+
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+benchmark:
+  type: "gpqa"
+  num_examples: 198
+  max_tokens: 65536
+  repeat: 8
+  num_threads: 128
