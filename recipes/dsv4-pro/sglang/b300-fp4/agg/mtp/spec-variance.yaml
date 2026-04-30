@@ -1,0 +1,97 @@
+# DeepSeek-V4-Pro EAGLE acceptance-length single-run recipe on B300.
+#
+# Server: same single-node TP=4 + EAGLE 3/4 shape as the InferenceX-port
+# recipe `1k1k/agg/mtp/agg-tp4-mtp-inferencex.yaml`. Bench: standard sa-bench
+# with `num_warmup_mult: 0` (skip warmup pass, so the server's cumulative
+# spec counters reflect ONLY this run's main pass) and a single concurrency
+# point.
+#
+# bench.sh has been extended to merge `/server_info` -> internal_states[*]
+# .avg_spec_accept_length into the result JSON after each main pass:
+#   - spec_accept_length_per_rank   list of per-rank averages (null if a
+#                                   rank has no spec data)
+#   - spec_accept_length_mean        simple mean of non-null entries
+#   - spec_num_internal_states       len(internal_states), for diagnostics
+# Because the server is fresh per job and warmup is skipped, this cumulative
+# IS the per-run acceptance length.
+#
+# Variance protocol: submit this recipe N times — each job gives one
+# independent number. Aggregate across submissions to get a variance
+# estimate. To sweep workload (1k/1k vs 8k/1k), copy the recipe and change
+# isl/osl, or set them via override.
+name: "dsv4-pro-b300-agg-tp4-mtp-spec-variance"
+
+slurm:
+  time_limit: "2:00:00"
+
+frontend:
+  type: sglang
+
+model:
+  path: "dsv4-pro"
+  container: "dsv4-blackwell"
+  precision: "mxfp4"
+
+resources:
+  gpu_type: "b300"
+  gpus_per_node: 8
+  agg_nodes: 1
+  agg_workers: 1
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    PYTHONUNBUFFERED: "1"
+    # Common SGLANG_* env vars from the InferenceX dsv4_fp4_b300_sglang_mtp.sh
+    # script. Apply to every config in their matrix.
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_OPT_SWA_SPLIT_LEAF_ON_INSERT: "1"
+    SGLANG_OPT_USE_JIT_NORM: "1"
+    SGLANG_OPT_USE_JIT_INDEXER_METADATA: "1"
+    SGLANG_OPT_USE_TOPK_V2: "1"
+    SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2: "1"
+
+  sglang_config:
+    aggregated:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+
+      tensor-parallel-size: 4
+      expert-parallel-size: 1
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      # InferenceX TP-only branch values.
+      chunked-prefill-size: 8192
+      mem-fraction-static: 0.90
+      swa-full-tokens-ratio: 0.1
+      # max(CONC * 3/2, 8). 12 covers CONC=8 (the single conc point below).
+      max-running-requests: 12
+
+      disable-radix-cache: true
+
+      # EAGLE 3/4 (DSv4 cookbook + InferenceX TP-only).
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  random_range_ratio: 0.8
+  # Single concurrency point — one main pass per job.
+  concurrencies: "8"
+  req_rate: "inf"
+  # Skip the warmup pass so the server's cumulative spec counters at
+  # /server_info reflect main-pass forwards only.
+  num_warmup_mult: 0
+  num_prompts_mult: 10
+  # DSv4-Pro chat encoder via the SGLang-side adapter (matches the
+  # InferenceX `--dsv4` flag).
+  use_chat_template: true
+  custom_tokenizer: "sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer"

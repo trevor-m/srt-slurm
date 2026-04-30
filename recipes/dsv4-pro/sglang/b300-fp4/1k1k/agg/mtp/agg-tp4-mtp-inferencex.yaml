@@ -1,0 +1,92 @@
+# DeepSeek-V4-Pro aggregated on B300 — TP=4, MXFP4, EAGLE MTP — sa-bench.
+#
+# Direct port of SemiAnalysisAI/InferenceX
+# `benchmarks/single_node/dsv4_fp4_b300_sglang_mtp.sh`, TP-only branch
+# (DP_ATTENTION=false): low/mid concurrency, EAGLE 3/4, flashinfer_mxfp4 MoE,
+# chunked-prefill 8192, mem-fraction 0.90.
+#
+# Use this for the conc 1–16 band. For conc >=16 use the DP-attn variant
+# (separate recipe / --dp-size $TP --enable-dp-attention --deepep-config ... +
+# EAGLE 1/2 + chunked-prefill 32768 + mem-fraction 0.92).
+#
+# B300 is x86_64 Blackwell — uses the `dsv4-blackwell` container alias (NOT
+# `dsv4-grace-blackwell`, which is the GB200/GB300 aarch64 image). See
+# srtslurm.yaml.example.
+#
+# CAR_V2 is enabled here (single-node agg, no multi-node decode), matching the
+# InferenceX script's `SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2=1` global default.
+name: "dsv4-pro-b300-agg-tp4-mtp-inferencex-1k1k"
+
+slurm:
+  time_limit: "2:00:00"
+
+frontend:
+  type: sglang
+
+model:
+  path: "dsv4-pro"
+  container: "dsv4-blackwell"
+  precision: "mxfp4"
+
+resources:
+  gpu_type: "b300"
+  gpus_per_node: 8
+  agg_nodes: 1
+  agg_workers: 1
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    PYTHONUNBUFFERED: "1"
+    # Common SGLANG_* env vars from the InferenceX script (apply to every
+    # config in their matrix).
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_OPT_SWA_SPLIT_LEAF_ON_INSERT: "1"
+    SGLANG_OPT_USE_JIT_NORM: "1"
+    SGLANG_OPT_USE_JIT_INDEXER_METADATA: "1"
+    SGLANG_OPT_USE_TOPK_V2: "1"
+    SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2: "1"
+
+  sglang_config:
+    aggregated:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+
+      tensor-parallel-size: 4
+      expert-parallel-size: 1
+
+      moe-runner-backend: "flashinfer_mxfp4"
+      disable-flashinfer-autotune: true
+
+      # InferenceX TP-only branch values.
+      chunked-prefill-size: 8192
+      mem-fraction-static: 0.90
+      swa-full-tokens-ratio: 0.1
+      # InferenceX formula: max-running = max(CONC * 3/2, 8). Set for the
+      # benchmark.concurrencies sweep below — `12` covers up to CONC=8.
+      # Bump to 24 / 48 / 96 if you raise the conc sweep ceiling.
+      max-running-requests: 12
+
+      disable-radix-cache: true
+
+      # EAGLE 3/4 (DSv4 cookbook + InferenceX TP-only).
+      speculative-algo: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  random_range_ratio: 0.8
+  # InferenceX uses a single CONC at a time with num_prompts = CONC * 10.
+  # srt-slurm sa-bench sweeps a list — keep it within the TP-only band.
+  concurrencies: "1x2x4x8"
+  req_rate: "inf"
+  # DSv4-Pro chat encoder via the SGLang-side adapter (mirrors the InferenceX
+  # `--dsv4` flag: prompts go through encoding_dsv4.py, NOT a jinja template).
+  use_chat_template: true
+  custom_tokenizer: "sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer"

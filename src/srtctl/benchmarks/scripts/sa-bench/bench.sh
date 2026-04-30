@@ -203,6 +203,48 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --save-result --result-dir "$result_dir" --result-filename "$result_filename"
     set +x
 
+    # Best-effort: query the server's cumulative spec metrics and merge into
+    # the result JSON. avg_spec_accept_length is the cumulative
+    # spec_total_num_accepted_tokens / spec_total_num_forward_ct on the
+    # scheduler — for one-run-per-job (fresh server, num_warmup_mult: 0)
+    # this equals the per-run acceptance length. Failures here are logged
+    # but do not abort the bench.
+    SERVER_INFO_URL="${ENDPOINT}/server_info"
+    RESULT_PATH="$result_dir/$result_filename"
+    python3 - "$RESULT_PATH" "$SERVER_INFO_URL" <<'PYEOF' || echo "[sa-bench] WARN: could not merge spec metrics"
+import json, sys, urllib.request
+
+result_path, server_info_url = sys.argv[1], sys.argv[2]
+try:
+    with open(result_path) as f:
+        result = json.load(f)
+except Exception as e:
+    print(f"[sa-bench] could not read {result_path}: {e}")
+    sys.exit(0)
+
+try:
+    with urllib.request.urlopen(server_info_url, timeout=10) as r:
+        info = json.loads(r.read())
+    states = info.get("internal_states") or []
+    per_rank = [s.get("avg_spec_accept_length") for s in states]
+    accepts = [a for a in per_rank if a is not None]
+    result["spec_accept_length_per_rank"] = per_rank
+    result["spec_accept_length_mean"] = (
+        sum(accepts) / len(accepts) if accepts else None
+    )
+    result["spec_num_internal_states"] = len(states)
+    print(
+        f"[sa-bench] spec_accept_length_mean={result['spec_accept_length_mean']} "
+        f"per_rank={per_rank}"
+    )
+except Exception as e:
+    result["spec_accept_length_error"] = str(e)
+    print(f"[sa-bench] spec metrics fetch failed: {e}")
+
+with open(result_path, "w") as f:
+    json.dump(result, f, indent=2)
+PYEOF
+
     echo "$(date '+%Y-%m-%d %H:%M:%S')"
     echo "Completed benchmark with concurrency: $concurrency"
     echo "-----------------------------------------"
