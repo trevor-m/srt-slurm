@@ -86,7 +86,6 @@ backend:
 
       disaggregation-mode: "prefill"
       disaggregation-transfer-backend: mooncake
-      disaggregation-bootstrap-port: 30001
 
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
@@ -114,7 +113,6 @@ backend:
 
       disaggregation-mode: "decode"
       disaggregation-transfer-backend: mooncake
-      disaggregation-bootstrap-port: 30001
 
       moe-runner-backend: "flashinfer_mxfp4"
       disable-flashinfer-autotune: true
