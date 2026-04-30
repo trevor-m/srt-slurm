@@ -85,7 +85,7 @@ benchmark:
   osl: 1024
   random_range_ratio: 0.8
   # Single concurrency point — one main pass per job.
-  concurrencies: "8"
+  concurrencies: "1"
   req_rate: "inf"
   # Skip the warmup pass so the server's cumulative spec counters at
   # /server_info reflect main-pass forwards only.
