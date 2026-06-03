@@ -19,7 +19,7 @@ frontend:
 
 model:
   path: "dsv4-pro-nvfp4"
-  container: "dsv4-grace-blackwell"
+  container: "dev"
   precision: "nvfp4"
 
 resources:
