@@ -1,0 +1,87 @@
+# DeepSeek-V4-Pro disaggregated on GB300 (1P1D, TP=4, NVFP4) — NS-GPQA accuracy.
+#
+# Same serving topology as disagg-1p1d-tp4-mxfp4.yaml (1 prefill + 1 decode node,
+# each TP=4 on a single GB300, dynamo frontend, NIXL KV transfer), but instead of
+# the sa-bench throughput sweep this runs the NeMo Skills GPQA accuracy eval with
+# the default options (num_examples=198, max_tokens=400000, num_threads=512) and
+# repeat=16.
+name: "dsv4-pro-gb300-disagg-1p1d-tp4-nvfp4-ns-gpqa"
+
+slurm:
+  partition: gb300
+  time_limit: "4:00:00"
+
+frontend:
+  type: dynamo
+  # `nginx` resolves to nginx:latest from Docker Hub via enroot — no local alias
+  # required. dynamo uses it as the fan-in / health-check entrypoint.
+  nginx_container: nginx
+
+model:
+  path: "dsv4-pro-nvfp4"
+  container: "dsv4-grace-blackwell"
+  precision: "nvfp4"
+
+resources:
+  gpu_type: "gb300"
+  prefill_nodes: 1
+  decode_nodes: 4
+  prefill_workers: 1
+  decode_workers: 4
+  gpus_per_node: 4
+
+backend:
+  type: sglang
+
+  prefill_environment:
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_DEFAULT_THINKING: "1"
+    SGLANG_DSV4_REASONING_EFFORT: "max"
+
+  decode_environment:
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+    SGLANG_DEFAULT_THINKING: "1"
+    SGLANG_DSV4_REASONING_EFFORT: "max"
+
+  sglang_config:
+    prefill:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+      disaggregation-mode: "prefill"
+      disaggregation-transfer-backend: nixl
+      moe-runner-backend: "flashinfer_trtllm_routed"
+      disable-flashinfer-autotune: true
+      mem-fraction-static: 0.90
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      #disable-radix-cache: true
+      reasoning-parser: "deepseek-v4"
+
+    decode:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
+      model-path: "/model/"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+      disaggregation-mode: "decode"
+      disaggregation-transfer-backend: nixl
+      moe-runner-backend: "flashinfer_trtllm_routed"
+      disable-flashinfer-autotune: true
+      mem-fraction-static: 0.90
+      max-running-requests: 128
+      cuda-graph-max-bs: 128
+      chunked-prefill-size: 8192
+      #disable-radix-cache: true
+      reasoning-parser: "deepseek-v4"
+
+benchmark:
+  type: "ns-gpqa"
+  # Defaults: num_examples=198, max_tokens=400000, num_threads=512.
+  repeat: 16
+  result_dir: "/lustre/fsw/coreai_dlfw_dev/tmorris/gpqa_results"
+
+# Used for persistent storage of gpqa results.
+container_mounts:
+  "/lustre": "/lustre"

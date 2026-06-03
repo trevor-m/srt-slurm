@@ -20,6 +20,7 @@ class TestBenchmarkRegistry:
         assert "sglang-bench" in benchmarks
         assert "mmlu" in benchmarks
         assert "gpqa" in benchmarks
+        assert "ns-gpqa" in benchmarks
         assert "gsm8k" in benchmarks
         assert "longbenchv2" in benchmarks
         assert "router" in benchmarks
@@ -638,6 +639,79 @@ class TestScriptsExist:
         """GSM8K script exists."""
         script = SCRIPTS_DIR / "gsm8k" / "bench.sh"
         assert script.exists()
+
+    def test_ns_gpqa_script_exists(self):
+        """NS-GPQA script exists."""
+        script = SCRIPTS_DIR / "ns-gpqa" / "bench.sh"
+        assert script.exists()
+
+
+class TestNSGPQARunner:
+    """Test NS-GPQA (NeMo Skills) runner."""
+
+    def test_registered(self):
+        """ns-gpqa is registered and resolves to the NeMo Skills runner."""
+        runner = get_runner("ns-gpqa")
+        assert runner.name == "NS-GPQA"
+        assert "ns-gpqa" in runner.script_path
+
+    def test_build_command_defaults(self):
+        """build_command uses the endpoint and NeMo Skills defaults."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.ns_gpqa import NSGPQARunner
+
+        runner = NSGPQARunner()
+        runtime = MagicMock()
+        runtime.frontend_port = 8000
+
+        config = MagicMock()
+        config.benchmark.num_examples = None
+        config.benchmark.max_tokens = None
+        config.benchmark.repeat = None
+        config.benchmark.num_threads = None
+        config.benchmark.result_dir = None
+
+        cmd = runner.build_command(config, runtime)
+        assert cmd == [
+            "bash",
+            "/srtctl-benchmarks/ns-gpqa/bench.sh",
+            "http://localhost:8000",
+            "198",
+            "400000",
+            "8",
+            "512",
+            "/logs/accuracy",
+        ]
+
+    def test_build_command_overrides(self):
+        """build_command threads through configured values."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.ns_gpqa import NSGPQARunner
+
+        runner = NSGPQARunner()
+        runtime = MagicMock()
+        runtime.frontend_port = 30000
+
+        config = MagicMock()
+        config.benchmark.num_examples = 50
+        config.benchmark.max_tokens = 60000
+        config.benchmark.repeat = 16
+        config.benchmark.num_threads = 64
+        config.benchmark.result_dir = "/lustre/results/gpqa"
+
+        cmd = runner.build_command(config, runtime)
+        assert cmd == [
+            "bash",
+            "/srtctl-benchmarks/ns-gpqa/bench.sh",
+            "http://localhost:30000",
+            "50",
+            "60000",
+            "16",
+            "64",
+            "/lustre/results/gpqa",
+        ]
 
 
 class TestCustomDatasetLoader:

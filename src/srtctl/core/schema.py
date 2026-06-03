@@ -672,6 +672,7 @@ class BenchmarkConfig:
     max_tokens: int | None = None
     repeat: int | None = None
     num_threads: int | None = None
+    result_dir: str | None = None  # Container path for accuracy results (ns-gpqa; default: /logs/accuracy)
     max_context_length: int | None = None
     categories: list[str] | None = None
     num_shots: int | None = None  # GSM8K few-shot examples
