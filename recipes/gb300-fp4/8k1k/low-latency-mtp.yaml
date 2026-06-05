@@ -1,6 +1,9 @@
 base:
   name: "gb300-fp4-8k1k-low-latency-mtp"
 
+  slurm:
+    partition: gb300
+
   dynamo:
     hash: "5b4bc1dd70965017a737c71b19db5a0aeaa88727"
     install: true
