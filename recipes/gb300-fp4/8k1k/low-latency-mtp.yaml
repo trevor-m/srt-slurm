@@ -9,7 +9,7 @@ base:
     type: dynamo
     enable_multiple_frontends: true
     num_additional_frontends: 3
-    nginx_container: nginx-sqsh
+    nginx_container: nginx
 
   model:
     path: "dsr1"
