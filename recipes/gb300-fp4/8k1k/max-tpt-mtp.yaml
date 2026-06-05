@@ -74,7 +74,6 @@ base:
         decode-log-interval: 1000
         watchdog-timeout: 1000000
         context-length: 9600
-        disable-shared-experts-fusion: true
         disaggregation-mode: "prefill"
         disaggregation-transfer-backend: nixl
         disaggregation-bootstrap-port: 30001
@@ -86,12 +85,14 @@ base:
         max-running-requests: 30000
         load-balance-method: "round_robin"
 
+        enable-dp-lm-head: true
+        moe-dense-tp-size: 1
         enable-dp-attention: true
         disable-flashinfer-autotune: true
 
-        tp-size: 2
-        dp-size: 2
-        ep-size: 2
+        tensor-parallel-size: 2
+        data-parallel-size: 2
+        expert-parallel-size: 2
 
         speculative-algorithm: "EAGLE"
         speculative-num-steps: 3
@@ -116,7 +117,6 @@ base:
         decode-log-interval: 1000
         watchdog-timeout: 1000000
         context-length: 9600
-        disable-shared-experts-fusion: true
         eplb-algorithm: "deepseek"
         disaggregation-mode: "decode"
         disaggregation-transfer-backend: nixl
@@ -138,9 +138,9 @@ base:
         enable-dp-lm-head: true
         enable-dp-attention: true
 
-        tp-size: 32
-        dp-size: 32
-        ep-size: 32
+        tensor-parallel-size: 32
+        data-parallel-size: 32
+        expert-parallel-size: 32
 
         speculative-algorithm: "EAGLE"
         speculative-num-steps: 3
@@ -157,11 +157,11 @@ base:
     concurrencies: "128x256x512"
 
 # dep32 variants at mtp3 only.
-# trtllm reference: ctx4-dep32 ~180 conc, ctx8-dep32 ~308 conc.
+# trtllm reference: ctx4(4p,2n)-dep32 ~180 conc, ctx8(8p,4n)-dep32 ~308 conc.
 zip_override_dep32:
   name:
-    - "gb300-fp4-8k1k-mtp-ctx4-dep32"
-    - "gb300-fp4-8k1k-mtp-ctx8-dep32"
+    - "gb300-fp4-8k1k-mtp3-4p-dep2-1d-dep32"
+    - "gb300-fp4-8k1k-mtp3-8p-dep2-1d-dep32"
   resources:
     prefill_nodes:   [2, 4]
     prefill_workers: [4, 8]
@@ -175,9 +175,9 @@ zip_override_dep32:
 # trtllm reference: ctx10-dep16 ~666 conc at mtp3.
 zip_override_ctx10_dep16_mtp:
   name:
-    - "gb300-fp4-8k1k-mtp1-ctx10-dep16"
-    - "gb300-fp4-8k1k-mtp2-ctx10-dep16"
-    - "gb300-fp4-8k1k-mtp3-ctx10-dep16"
+    - "gb300-fp4-8k1k-mtp1-10p-dep2-1d-dep16"
+    - "gb300-fp4-8k1k-mtp2-10p-dep2-1d-dep16"
+    - "gb300-fp4-8k1k-mtp3-10p-dep2-1d-dep16"
   resources:
     prefill_nodes: 5
     prefill_workers: 10
@@ -188,9 +188,9 @@ zip_override_ctx10_dep16_mtp:
         speculative-num-steps:       [1, 2, 3]
         speculative-num-draft-tokens: [2, 3, 4]
       decode:
-        tp-size: 16
-        dp-size: 16
-        ep-size: 16
+        tensor-parallel-size: 16
+        data-parallel-size: 16
+        expert-parallel-size: 16
         max-total-tokens: 2097152
         speculative-num-steps:       [1, 2, 3]
         speculative-num-draft-tokens: [2, 3, 4]
@@ -201,9 +201,9 @@ zip_override_ctx10_dep16_mtp:
 # trtllm reference: ctx13-dep16 ~1127 conc at mtp3.
 zip_override_ctx13_dep16_mtp:
   name:
-    - "gb300-fp4-8k1k-mtp1-ctx13-dep16"
-    - "gb300-fp4-8k1k-mtp2-ctx13-dep16"
-    - "gb300-fp4-8k1k-mtp3-ctx13-dep16"
+    - "gb300-fp4-8k1k-mtp1-13p-dep2-1d-dep16"
+    - "gb300-fp4-8k1k-mtp2-13p-dep2-1d-dep16"
+    - "gb300-fp4-8k1k-mtp3-13p-dep2-1d-dep16"
   resources:
     prefill_nodes: 7
     prefill_workers: 13
@@ -214,9 +214,9 @@ zip_override_ctx13_dep16_mtp:
         speculative-num-steps:       [1, 2, 3]
         speculative-num-draft-tokens: [2, 3, 4]
       decode:
-        tp-size: 16
-        dp-size: 16
-        ep-size: 16
+        tensor-parallel-size: 16
+        data-parallel-size: 16
+        expert-parallel-size: 16
         max-total-tokens: 2097152
         speculative-num-steps:       [1, 2, 3]
         speculative-num-draft-tokens: [2, 3, 4]

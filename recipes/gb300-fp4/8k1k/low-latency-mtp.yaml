@@ -27,48 +27,37 @@ base:
     decode_workers: 4
     gpus_per_node: 4
 
+  # Common env vars for all workers (prefill + decode).
+  # decode_environment below adds decode-only vars on top of these.
+  environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
+    SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
+    SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
+    SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
+    SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
+    SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
+    MC_TE_METRIC: "true"
+    MC_FORCE_MNNVL: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
+    SGLANG_ENABLE_SPEC_V2: "1"
+    SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
+    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+
   backend:
-
-    prefill_environment:
-      TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-      PYTHONUNBUFFERED: "1"
-      DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
-      SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
-      SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
-      SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
-      SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
-      SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
-      SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
-      MC_FORCE_MNNVL: "1"
-      NCCL_MNNVL_ENABLE: "1"
-      NCCL_CUMEM_ENABLE: "1"
-      SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
-      SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-      SGLANG_ENABLE_SPEC_V2: "1"
-
-    decode_environment:
-      TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
-      PYTHONUNBUFFERED: "1"
-      DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
-      SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
-      SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
-      SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
-      SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
-      SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
-      SGLANG_DECODE_BOOTSTRAP_TIMEOUT: "1000"
-      MC_FORCE_MNNVL: "1"
-      NCCL_MNNVL_ENABLE: "1"
-      NCCL_CUMEM_ENABLE: "1"
-      SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
-      SGLANG_ENABLE_JIT_DEEPGEMM: "false"
-      SGLANG_ENABLE_SPEC_V2: "1"
-
     sglang_config:
       prefill:
         disaggregation-mode: "prefill"
         served-model-name: "deepseek-ai/DeepSeek-R1"
         trust-remote-code: true
         disable-radix-cache: true
+        disable-chunked-prefix-cache: true
         kv-cache-dtype: "fp8_e4m3"
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
@@ -95,12 +84,12 @@ base:
         speculative-eagle-topk: 1
         speculative-num-draft-tokens: 4
 
-
       decode:
         disaggregation-mode: "decode"
         served-model-name: "deepseek-ai/DeepSeek-R1"
         trust-remote-code: true
         disable-radix-cache: true
+        disable-chunked-prefix-cache: true
         kv-cache-dtype: "fp8_e4m3"
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
@@ -126,56 +115,51 @@ base:
 
   benchmark:
     type: "sa-bench"
-    isl: 8192 
+    isl: 8192
     osl: 1024
     req_rate: "inf"
     concurrencies: "4x8x16x32x64"
 
-# Low-latency variants: 1 prefill worker (same sglang config as mtp_sweep base prefill:
-# tp=2, dp=2, ep=2, gpus_per_prefill=2, matching trtllm tep8 reference prefill).
-# Decode: 3 or 4 workers at TP=8 (2 nodes each, 8 GPUs per worker).
-#   tep8: TP=8, EP=8, no attention DP — follows trtllm/gb300-fp4/8k1k/mtp/*tep8* reference.
-#   tp8:  TP=8, DP=8, EP=8, attention DP enabled — dep-style at scale 8.
-# Both 1p4d variants share concurrencies for direct tep8 vs tp8 comparison.
-# trtllm reference: ctx1-gen3-tep8 ~33 conc, ctx1-gen4-tep8 ~24 conc.
+# Low-latency variants: 1 prefill worker (dep2 style: tp=2, dp=2, ep=2, gpus_per_prefill=2,
+# matching trtllm/gb300-fp4/8k1k/mtp/*tep8* prefill reference).
+# Decode sweeps TP=8 (2 nodes/worker) with 3 or 4 workers, and TP=4 (1 node/worker) with 4 workers.
+#   tep8/tep4: EP=TP, no attention DP — TP+EP using allreduce (no deepep needed).
+#   tp8/tp4:   EP=1, no attention DP — pure tensor parallel.
+# trtllm reference: ctx1-gen4-tep8 ~24-48 conc (GB300).
+# TODO(tmorris): Decide on best decode worker (tep8 vs tp8 vs tep4 vs tp4) and remvoe the rest.
 zip_override_1p_dep2:
   name:
-    - "gb300-fp4-8k1k-mtp3-1p3d-tep8"
-    - "gb300-fp4-8k1k-mtp3-1p3d-tp8"
-    - "gb300-fp4-8k1k-mtp3-1p4d-tep8"
-    - "gb300-fp4-8k1k-mtp3-1p4d-tp8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tep8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tp8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tep8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tep4"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp4"
   resources:
     prefill_nodes: 1
     prefill_workers: 1
     gpus_per_prefill: 2
-    decode_nodes:   [6, 6, 8, 8]
-    decode_workers: [3, 3, 4, 4]
+    decode_nodes:   [6, 6, 8, 8, 4, 4]
+    decode_workers: [3, 3, 4, 4, 4, 4]
   frontend:
     num_additional_frontends: 3
   backend:
     sglang_config:
       prefill:
-        tp-size: 2
-        dp-size: 2
-        ep-size: 2
+        tensor-parallel-size: 2
+        data-parallel-size: 2
+        expert-parallel-size: 2
         enable-dp-attention: true
-        disable-cuda-graph: true
+        enable-dp-lm-head: true
+        moe-dense-tp-size: 1
         mem-fraction-static: 0.85
         max-total-tokens: 131072
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-        disable-shared-experts-fusion: true
-        disable-chunked-prefix-cache: true
         speculative-moe-runner-backend: "deep_gemm"
         speculative-moe-a2a-backend: "deepep"
       decode:
-        tp-size: 8
-        dp-size: 1
-        ep-size: [8, 1, 8, 1]
-  benchmark:
-    concurrencies:
-      - "4x8x16x32x64"
-      - "4x8x16x32x64"
-      - "4x8x16x32x64"
-      - "4x8x16x32x64"
+        tensor-parallel-size: [8, 8, 8, 8, 4, 4]
+        data-parallel-size: 1
+        expert-parallel-size: [8, 1, 8, 1, 4, 1]
