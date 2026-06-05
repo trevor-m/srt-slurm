@@ -16,6 +16,10 @@ NUM_THREADS=${5:-512}
 RESULT_DIR=${6:-/logs/accuracy}
 STARTING_SEED=${STARTING_SEED:-7023}
 
+# Export so child processes (ns prepare_data / nemo-run) inherit it; a plain
+# shell var passes the guard below but never reaches the gated-dataset download.
+#export HF_TOKEN=<secret>
+
 # Auto-detect model name from /v1/models endpoint; fall back to default
 MODEL_NAME=$(curl -s "${ENDPOINT}/v1/models" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "")
 if [ -z "${MODEL_NAME}" ]; then
@@ -38,6 +42,10 @@ source /sgl-workspace/ns-venv/bin/activate
 
 uv pip install git+https://github.com/NVIDIA-NeMo/Skills.git@d77caab 'tree_sitter_language_pack<1.0' --reinstall-package blinker
 ns prepare_data gpqa --split diamond
+
+# Timestamp so the post-eval guard only counts results written by THIS run (the shared
+# result_dir may already hold metrics.json from an earlier run).
+EVAL_START=$(date +%s)
 ns eval \
   --server_type=openai \
   --model=${MODEL_NAME} \
@@ -49,6 +57,16 @@ ns eval \
   ++inference.temperature=1.0 \
   ++inference.top_p=1.0 \
   ++inference.timeout=25000000 \
+  ++parse_reasoning=True \
   --starting_seed ${STARTING_SEED}
+
+# Fail loud: `ns eval` can exit 0 even when every generation 503'd and no results were
+# written (job 2000136 reported "success" with an empty eval-results dir). Require a
+# metrics.json written during THIS run before declaring success.
+if ! find "${RESULT_DIR}" -name 'metrics.json' -type f -newermt "@${EVAL_START}" 2>/dev/null | grep -q .; then
+    echo "ERROR: GPQA eval produced no fresh metrics.json under ${RESULT_DIR}; the eval did not complete." >&2
+    echo "       Check the log above for 503 / 'no_available_workers' / worker saturation." >&2
+    exit 1
+fi
 
 echo "GPQA evaluation complete; results in ${RESULT_DIR}"

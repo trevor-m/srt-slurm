@@ -1,21 +1,41 @@
-# DeepSeek-V4-Pro disaggregated on GB300 (1P1D, TP=4, NVFP4) — NS-GPQA accuracy.
+# DeepSeek-V4-Pro aggregated on GB300 (8x TP=4 agg workers, NVFP4) — NS-GPQA accuracy.
 #
-# Same serving topology as disagg-1p1d-tp4-mxfp4.yaml (1 prefill + 1 decode node,
-# each TP=4 on a single GB300, dynamo frontend, NIXL KV transfer), but instead of
-# the sa-bench throughput sweep this runs the NeMo Skills GPQA accuracy eval with
-# the default options (num_examples=198, max_tokens=400000, num_threads=512) and
-# repeat=16.
-name: "dsv4-pro-gb300-disagg-1p1d-tp4-nvfp4-ns-gpqa"
+# Aggregated serving: 8 SGLang workers, each TP=4 on a single GB300 node, behind the
+# SGLang router frontend. Each worker handles both prefill and decode (no KV transfer /
+# disaggregation). Runs the NeMo Skills GPQA accuracy eval with max_tokens=400000 and
+# reasoning effort "max" (repeat=16). Concurrency and router timeouts are sized so the
+# workers/router don't saturate — see job 2000136, which crashed with 503
+# "no_available_workers" after oversubscribing 4 workers ~40x and tripping the router's
+# 30-min request timeout + circuit breaker.
+name: "dsv4-pro-gb300-agg-tp4-nvfp4-ns-gpqa"
 
 slurm:
   partition: gb300
-  time_limit: "4:00:00"
+  # 400K-token max-reasoning generations can take hours each; 4h was far too short.
+  time_limit: "5:00:00"
 
 frontend:
-  type: dynamo
-  # `nginx` resolves to nginx:latest from Docker Hub via enroot — no local alias
-  # required. dynamo uses it as the fan-in / health-check entrypoint.
-  nginx_container: nginx
+  type: sglang
+  # Cache-aware routing: GPQA re-asks the same 198 questions (repeat=16), so
+  # steering identical prompt prefixes to the same worker maximizes KV reuse.
+  args:
+    policy: cache_aware
+    # Router resilience for very long generations (max_tokens=400000, reasoning=max).
+    # The launch_router defaults killed job 2000136: request-timeout 1800s (30 min)
+    # aborted in-flight decodes, health-check-timeout 5s flagged busy-but-alive workers,
+    # and the circuit breaker (10 failures) then 503'd everything. A single 400K-token
+    # decode can take hours, so relax all three.
+    request-timeout-secs: 36000        # 10h (was 1800)
+    health-check-timeout-secs: 30      # was 5; busy workers answer /health late
+    health-failure-threshold: 5        # was 3
+    disable-circuit-breaker: true      # don't eject slow-but-alive workers mid-eval
+    # Hard backstop against oversubscription: `ns eval --benchmarks=gpqa:16` runs 16
+    # generation jobs concurrently, each with its own max_concurrent_requests, so the
+    # client can offer up to 16 x num_threads. Cap admitted concurrency at real server
+    # capacity and queue (don't drop) the rest. 128 = agg_workers(8) x max-running-requests(16).
+    max-concurrent-requests: 128
+    queue-size: 20000
+    queue-timeout-secs: 36000          # 10h; don't time out queued requests (was 60)
 
 model:
   path: "dsv4-pro-nvfp4"
@@ -24,62 +44,45 @@ model:
 
 resources:
   gpu_type: "gb300"
-  prefill_nodes: 1
-  decode_nodes: 4
-  prefill_workers: 1
-  decode_workers: 4
   gpus_per_node: 4
+  # Aggregated mode: 8 TP=4 workers = 32 GPUs across 8 nodes. Doubles aggregate KV vs
+  # the 4-worker run so the 128-concurrent working set fits without perpetual retraction.
+  agg_nodes: 8
+  agg_workers: 8
 
 backend:
   type: sglang
 
-  prefill_environment:
-    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
-    SGLANG_DEFAULT_THINKING: "1"
-    SGLANG_DSV4_REASONING_EFFORT: "max"
-
-  decode_environment:
+  aggregated_environment:
     SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
     SGLANG_DEFAULT_THINKING: "1"
     SGLANG_DSV4_REASONING_EFFORT: "max"
 
   sglang_config:
-    prefill:
+    aggregated:
       served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
       model-path: "/model/"
       trust-remote-code: true
       tensor-parallel-size: 4
-      disaggregation-mode: "prefill"
-      disaggregation-transfer-backend: nixl
       moe-runner-backend: "flashinfer_trtllm_routed"
       disable-flashinfer-autotune: true
       mem-fraction-static: 0.90
-      max-running-requests: 128
-      cuda-graph-max-bs: 128
-      chunked-prefill-size: 8192
-      #disable-radix-cache: true
-      reasoning-parser: "deepseek-v4"
-
-    decode:
-      served-model-name: "deepseek-ai/DeepSeek-V4-Pro"
-      model-path: "/model/"
-      trust-remote-code: true
-      tensor-parallel-size: 4
-      disaggregation-mode: "decode"
-      disaggregation-transfer-backend: nixl
-      moe-runner-backend: "flashinfer_trtllm_routed"
-      disable-flashinfer-autotune: true
-      mem-fraction-static: 0.90
-      max-running-requests: 128
-      cuda-graph-max-bs: 128
+      # KV pool is ~1.5M tokens/worker; with 400K-token requests, ~16 concurrent leaves
+      # ~90K tokens/request of headroom before retraction. 16 x 8 workers = 128 capacity.
+      max-running-requests: 16
+      cuda-graph-max-bs: 16            # match max-running-requests; frees HBM for KV
       chunked-prefill-size: 8192
       #disable-radix-cache: true
       reasoning-parser: "deepseek-v4"
 
 benchmark:
   type: "ns-gpqa"
-  # Defaults: num_examples=198, max_tokens=400000, num_threads=512.
+  # Defaults: num_examples=198, max_tokens=400000.
   repeat: 16
+  # Per-seed-job concurrency. ns runs `repeat` (16) jobs at once, so total offered =
+  # 16 x 8 = 128 = server capacity (agg_workers x max-running-requests). The 512 default
+  # offered ~8192 and buried the workers (job 2000136).
+  num_threads: 8
   result_dir: "/lustre/fsw/coreai_dlfw_dev/tmorris/gpqa_results"
 
 # Used for persistent storage of gpqa results.
