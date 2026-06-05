@@ -1,0 +1,223 @@
+base:
+  name: "gb200-fp4-8k1k-mtp"
+
+  slurm:
+    partition: gb200
+
+  dynamo:
+    hash: "5b4bc1dd70965017a737c71b19db5a0aeaa88727"
+    install: true
+
+  frontend:
+    type: dynamo
+    enable_multiple_frontends: true
+    num_additional_frontends: 9
+    nginx_container: nginx
+
+  model:
+    path: "dsr1"
+    container: "lmsysorg/sglang:v0.5.12.post1"
+    precision: "fp4"
+
+  resources:
+    gpu_type: "gb200"
+    gpus_per_node: 4
+    prefill_nodes: 3
+    prefill_workers: 3
+    decode_nodes: 8
+    decode_workers: 1
+
+  # Common env vars for all workers (prefill + decode).
+  # decode_environment below adds decode-only vars on top of these.
+  environment:
+    TORCH_DISTRIBUTED_DEFAULT_TIMEOUT: "1800"
+    PYTHONUNBUFFERED: "1"
+    DYN_SKIP_SGLANG_LOG_FORMATTING: "1"
+    SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN: "1"
+    SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2: "1"
+    SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE: "100000"
+    SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT: "100000"
+    SGLANG_DISAGGREGATION_WAITING_TIMEOUT: "100000"
+    MC_TE_METRIC: "true"
+    MC_FORCE_MNNVL: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    SGLANG_MOONCAKE_CUSTOM_MEM_POOL: "True"
+    SGLANG_USE_MESSAGE_QUEUE_BROADCASTER: "0"
+    SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK: "1"
+    SGLANG_ENABLE_SPEC_V2: "1"
+    SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
+    SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+    SGLANG_BLACKWELL_OVERLAP_SHARED_EXPERTS_OUTSIDE_SBO: "1"
+
+  backend:
+
+    decode_environment:
+      SGLANG_MOE_NVFP4_DISPATCH: "1"
+      SGLANG_NCCL_ALL_GATHER_IN_OVERLAP_SCHEDULER_SYNC_BATCH: "1"
+
+    sglang_config:
+      prefill:
+        served-model-name: "deepseek-ai/DeepSeek-R1"
+        model-path: "/model/"
+        trust-remote-code: true
+
+        kv-cache-dtype: "fp8_e4m3"
+        attention-backend: "trtllm_mla"
+        quantization: "modelopt_fp4"
+        moe-runner-backend: "flashinfer_trtllm"
+
+        disable-radix-cache: true
+        disable-chunked-prefix-cache: true
+        stream-interval: 50
+        decode-log-interval: 1000
+        watchdog-timeout: 1000000
+        context-length: 9600
+        disaggregation-mode: "prefill"
+        disaggregation-transfer-backend: nixl
+        disaggregation-bootstrap-port: 30001
+
+        mem-fraction-static: 0.85
+        max-total-tokens: 131072
+        max-prefill-tokens: 524288
+        chunked-prefill-size: 131072
+        max-running-requests: 30000
+        load-balance-method: "round_robin"
+
+        enable-dp-attention: true
+        enable-dp-lm-head: true
+        moe-dense-tp-size: 1
+        disable-flashinfer-autotune: true
+
+        tensor-parallel-size: 4
+        data-parallel-size: 4
+        expert-parallel-size: 4
+
+        speculative-algorithm: "EAGLE"
+        speculative-num-steps: 3
+        speculative-eagle-topk: 1
+        speculative-num-draft-tokens: 4
+        speculative-moe-runner-backend: "deep_gemm"
+        speculative-moe-a2a-backend: "deepep"
+
+      decode:
+        served-model-name: "deepseek-ai/DeepSeek-R1"
+        model-path: "/model/"
+        trust-remote-code: true
+
+        kv-cache-dtype: "fp8_e4m3"
+        attention-backend: "trtllm_mla"
+        quantization: "modelopt_fp4"
+        moe-runner-backend: "flashinfer_cutedsl"
+
+        disable-radix-cache: true
+        disable-chunked-prefix-cache: true
+        stream-interval: 50
+        decode-log-interval: 1000
+        watchdog-timeout: 1000000
+        context-length: 9600
+        eplb-algorithm: "deepseek"
+        disaggregation-mode: "decode"
+        disaggregation-transfer-backend: nixl
+        disaggregation-bootstrap-port: 30001
+
+        mem-fraction-static: 0.8
+        max-total-tokens: 524288
+        chunked-prefill-size: 24576
+        max-running-requests: 16384
+
+        moe-a2a-backend: "deepep"
+        deepep-mode: "low_latency"
+        ep-dispatch-algorithm: "static"
+
+        cuda-graph-max-bs: 256
+        num-reserved-decode-tokens: 112
+
+        moe-dense-tp-size: 1
+        enable-dp-lm-head: true
+        enable-dp-attention: true
+
+        tensor-parallel-size: 32
+        data-parallel-size: 32
+        expert-parallel-size: 32
+
+        speculative-algorithm: "EAGLE"
+        speculative-num-steps: 3
+        speculative-eagle-topk: 1
+        speculative-num-draft-tokens: 4
+        speculative-moe-runner-backend: "deep_gemm"
+        speculative-moe-a2a-backend: "deepep"
+
+  benchmark:
+    type: "sa-bench"
+    isl: 8192
+    osl: 1024
+    req_rate: "inf"
+    concurrencies: "128x256x512"
+
+# dep32 variants at mtp3 only.
+# trtllm reference: ctx3-dep32 ~180 conc, ctx8-dep32 ~666 conc.
+zip_override_dep32:
+  name:
+    - "gb200-fp4-8k1k-mtp3-3p-dep4-1d-dep32"
+    - "gb200-fp4-8k1k-mtp3-8p-dep4-1d-dep32"
+  resources:
+    prefill_nodes:   [3, 8]
+    prefill_workers: [3, 8]
+    decode_nodes:    [8, 8]
+  benchmark:
+    concurrencies:
+      - "128x256x512"
+      - "512x1024"
+
+# dep16 mtp sweep for ctx7 (7 prefill nodes, 7 workers, 4 decode nodes, TP=16).
+# trtllm reference: ctx7-dep16 ~1229 conc at mtp1.
+zip_override_ctx7_dep16_mtp:
+  name:
+    - "gb200-fp4-8k1k-mtp1-7p-dep4-1d-dep16"
+    - "gb200-fp4-8k1k-mtp2-7p-dep4-1d-dep16"
+    - "gb200-fp4-8k1k-mtp3-7p-dep4-1d-dep16"
+  resources:
+    prefill_nodes: 7
+    prefill_workers: 7
+    decode_nodes: 4
+  backend:
+    sglang_config:
+      prefill:
+        speculative-num-steps:       [1, 2, 3]
+        speculative-num-draft-tokens: [2, 3, 4]
+      decode:
+        tensor-parallel-size: 16
+        data-parallel-size: 16
+        expert-parallel-size: 16
+        max-total-tokens: 2097152
+        speculative-num-steps:       [1, 2, 3]
+        speculative-num-draft-tokens: [2, 3, 4]
+  benchmark:
+    concurrencies: "512x1024x2048"
+
+# dep16 mtp sweep for ctx11 (11 prefill nodes, 11 workers, 4 decode nodes, TP=16).
+# trtllm reference: ctx11-dep16 ~4301 conc at mtp1.
+zip_override_ctx11_dep16_mtp:
+  name:
+    - "gb200-fp4-8k1k-mtp1-11p-dep4-1d-dep16"
+    - "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16"
+    - "gb200-fp4-8k1k-mtp3-11p-dep4-1d-dep16"
+  resources:
+    prefill_nodes: 11
+    prefill_workers: 11
+    decode_nodes: 4
+  backend:
+    sglang_config:
+      prefill:
+        speculative-num-steps:       [1, 2, 3]
+        speculative-num-draft-tokens: [2, 3, 4]
+      decode:
+        tensor-parallel-size: 16
+        data-parallel-size: 16
+        expert-parallel-size: 16
+        max-total-tokens: 2097152
+        speculative-num-steps:       [1, 2, 3]
+        speculative-num-draft-tokens: [2, 3, 4]
+  benchmark:
+    concurrencies: "1024x2048x4096"
