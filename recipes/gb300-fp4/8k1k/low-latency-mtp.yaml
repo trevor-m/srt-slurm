@@ -159,6 +159,7 @@ zip_override_1p_dep2:
         max-running-requests: 30000
         speculative-moe-runner-backend: "deep_gemm"
         speculative-moe-a2a-backend: "deepep"
+        scheduler-recv-interval: null
       decode:
         tensor-parallel-size: [8, 8, 8, 8, 4, 4]
         data-parallel-size: 1
