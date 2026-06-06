@@ -70,7 +70,6 @@ base:
         max-total-tokens: 32768
         chunked-prefill-size: 24576
         max-running-requests: 512
-        scheduler-recv-interval: 10
         enable-symm-mem: true
         load-balance-method: "round_robin"
         disaggregation-bootstrap-port: 30001
@@ -159,7 +158,6 @@ zip_override_1p_dep2:
         max-running-requests: 30000
         speculative-moe-runner-backend: "deep_gemm"
         speculative-moe-a2a-backend: "deepep"
-        scheduler-recv-interval: null
       decode:
         tensor-parallel-size: [8, 8, 8, 8, 4, 4]
         data-parallel-size: 1
