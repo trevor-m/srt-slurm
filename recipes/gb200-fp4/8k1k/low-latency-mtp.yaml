@@ -117,59 +117,14 @@ base:
     req_rate: "inf"
     concurrencies: "4x8x16x32x64"
 
-# Low-latency variants: 1 prefill worker (dep4 style: tp=4, dp=4, ep=4, full node,
-# matching trtllm/gb200-fp4/8k1k/mtp/*tep8* prefill reference).
-# Decode sweeps TP=8 (2 nodes/worker) and TP=4 (1 node/worker), 4 workers each.
-#   tep8/tep4: EP=TP, no attention DP — TP+EP using allreduce (no deepep needed).
-#   tp8/tp4:   EP=1, no attention DP — pure tensor parallel.
-# trtllm reference: ctx1-gen4-tep8 ~24-48 conc (GB200).
-# TODO(tmorris): Decide on best decode worker (tep8 vs tp8 vs tep4 vs tp4) and remvoe the rest.
 zip_override_1p_dep4:
   name:
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep8"
     - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp8"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep4"
     - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4"
   resources:
     prefill_nodes: 1
     prefill_workers: 1
-    decode_nodes:   [8, 8, 4, 4]
-  frontend:
-    num_additional_frontends: 3
-  backend:
-    prefill_environment:
-      SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
-      SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
-    sglang_config:
-      prefill:
-        tensor-parallel-size: 4
-        data-parallel-size: 4
-        expert-parallel-size: 4
-        enable-dp-attention: true
-        enable-dp-lm-head: true
-        moe-dense-tp-size: 1
-        mem-fraction-static: 0.85
-        max-total-tokens: 131072
-        max-prefill-tokens: 524288
-        chunked-prefill-size: 131072
-        max-running-requests: 30000
-        speculative-moe-runner-backend: "deep_gemm"
-        speculative-moe-a2a-backend: "deepep"
-      decode:
-        tensor-parallel-size: [8, 8, 4, 4]
-        data-parallel-size: 1
-        expert-parallel-size: [8, 1, 4, 1]
-
-zip_override_1p_dep4_default_nextn:
-  name:
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep8"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp8"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep4"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4"
-  resources:
-    prefill_nodes: 1
-    prefill_workers: 1
-    decode_nodes:   [8, 8, 4, 4]
+    decode_nodes:   [8, 4]
   frontend:
     num_additional_frontends: 3
   backend:
@@ -187,20 +142,20 @@ zip_override_1p_dep4_default_nextn:
         chunked-prefill-size: 131072
         max-running-requests: 30000
       decode:
-        tensor-parallel-size: [8, 8, 4, 4]
+        tensor-parallel-size: [8, 4]
         data-parallel-size: 1
-        expert-parallel-size: [8, 1, 4, 1]
+        expert-parallel-size: 1
 
 zip_override_1p_dep4_experimental_a2a:
   name:
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep8-experimental-a2a"
     - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp8-experimental-a2a"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tep4-experimental-a2a"
     - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4-experimental-a2a"
+  model:
+    container: "dev"
   resources:
     prefill_nodes: 1
     prefill_workers: 1
-    decode_nodes:   [8, 8, 4, 4]
+    decode_nodes:   [8, 4]
   frontend:
     num_additional_frontends: 3
   backend:
@@ -219,9 +174,7 @@ zip_override_1p_dep4_experimental_a2a:
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-        speculative-moe-runner-backend: "flashinfer_trtllm_routed"
-        speculative-moe-a2a-backend: "flashinfer"
       decode:
-        tensor-parallel-size: [8, 8, 4, 4]
+        tensor-parallel-size: [8, 4]
         data-parallel-size: 1
-        expert-parallel-size: [8, 1, 4, 1]
+        expert-parallel-size: 1
