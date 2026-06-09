@@ -76,10 +76,6 @@ base:
         expert-parallel-size: 1
         enable-dp-attention: false
         disaggregation-transfer-backend: nixl
-        speculative-algorithm: "EAGLE"
-        speculative-num-steps: 3
-        speculative-eagle-topk: 1
-        speculative-num-draft-tokens: 4
 
       decode:
         disaggregation-mode: "decode"

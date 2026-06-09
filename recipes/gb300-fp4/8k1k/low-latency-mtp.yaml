@@ -78,10 +78,6 @@ base:
         expert-parallel-size: 1
         enable-dp-attention: false
         disaggregation-transfer-backend: nixl
-        speculative-algorithm: "EAGLE"
-        speculative-num-steps: 3
-        speculative-eagle-topk: 1
-        speculative-num-draft-tokens: 4
 
       decode:
         disaggregation-mode: "decode"
@@ -104,6 +100,7 @@ base:
         scheduler-recv-interval: 10
         enable-symm-mem: true
         tensor-parallel-size: 4
+        data-parallel-size: 1
         expert-parallel-size: 1
         enable-dp-attention: false
         disaggregation-transfer-backend: nixl
@@ -126,14 +123,15 @@ base:
 zip_override_1p_dep2:
   name:
     - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tp8"
+    - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tp4"
     - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp8"
     - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp4"
   resources:
     prefill_nodes: 1
     prefill_workers: 1
     gpus_per_prefill: 2
-    decode_nodes:   [6, 8, 4]
-    decode_workers: [3, 4, 4]
+    decode_nodes:   [6, 3, 8, 4]
+    decode_workers: [3, 3, 4, 4]
   frontend:
     num_additional_frontends: 3
   backend:
@@ -150,9 +148,5 @@ zip_override_1p_dep2:
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-        speculative-moe-runner-backend: "deep_gemm"
-        speculative-moe-a2a-backend: "deepep"
       decode:
-        tensor-parallel-size: [8, 8, 4]
-        data-parallel-size: 1
-        expert-parallel-size: 1
+        tensor-parallel-size: [8, 4, 8, 4]

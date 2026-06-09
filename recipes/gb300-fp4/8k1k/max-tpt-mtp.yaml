@@ -95,13 +95,6 @@ base:
         data-parallel-size: 2
         expert-parallel-size: 2
 
-        speculative-algorithm: "EAGLE"
-        speculative-num-steps: 3
-        speculative-eagle-topk: 1
-        speculative-num-draft-tokens: 4
-        speculative-moe-runner-backend: "deep_gemm"
-        speculative-moe-a2a-backend: "deepep"
-
       decode:
         served-model-name: "deepseek-ai/DeepSeek-R1"
         model-path: "/model/"
@@ -185,9 +178,6 @@ zip_override_ctx10_dep16_mtp:
     decode_nodes: 4
   backend:
     sglang_config:
-      prefill:
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
       decode:
         tensor-parallel-size: 16
         data-parallel-size: 16
@@ -211,9 +201,6 @@ zip_override_ctx13_dep16_mtp:
     decode_nodes: 4
   backend:
     sglang_config:
-      prefill:
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
       decode:
         tensor-parallel-size: 16
         data-parallel-size: 16
