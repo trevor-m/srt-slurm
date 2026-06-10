@@ -67,6 +67,7 @@ base:
         max-total-tokens: 32768
         chunked-prefill-size: 24576
         max-running-requests: 512
+        scheduler-recv-interval: 10
         enable-symm-mem: true
         load-balance-method: "round_robin"
         disaggregation-bootstrap-port: 30001
@@ -113,22 +114,16 @@ base:
 
 # Low-latency variants: 1 prefill worker (dep2 style: tp=2, dp=2, ep=2, gpus_per_prefill=2,
 # matching trtllm/gb300-fp4/8k1k/mtp/*tep8* prefill reference).
-# Decode: pure TP (EP=1) at TP=8 (2 nodes/worker, 3 or 4 workers) and TP=4 (1 node/worker, 4 workers).
+# Decode: pure TP at TP=4 (1 node/worker, 4 workers).
 # trtllm reference: ctx1-gen4-tep8 ~24-48 conc (GB300).
 zip_override_1p_dep2:
   name:
-    - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tp8"
     - "gb300-fp4-8k1k-mtp3-1p-dep2-3d-tp4"
-    - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp8"
     - "gb300-fp4-8k1k-mtp3-1p-dep2-4d-tp4"
   resources:
-    prefill_nodes: 1
-    prefill_workers: 1
     gpus_per_prefill: 2
-    decode_nodes:   [6, 3, 8, 4]
-    decode_workers: [3, 3, 4, 4]
-  frontend:
-    num_additional_frontends: 3
+    decode_nodes:   [3, 4]
+    decode_workers: [3, 4]
   backend:
     sglang_config:
       prefill:
@@ -143,5 +138,24 @@ zip_override_1p_dep2:
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-      decode:
-        tensor-parallel-size: [8, 4, 8, 4]
+        scheduler-recv-interval: 1
+
+zip_override_1p_tp2:
+  name:
+    - "gb300-fp4-8k1k-mtp3-1p-tp2-3d-tp4"
+    - "gb300-fp4-8k1k-mtp3-1p-tp2-4d-tp4"
+  resources:
+    gpus_per_prefill: 2
+    decode_nodes:   [3, 4]
+    decode_workers: [3, 4]
+  backend:
+    sglang_config:
+      prefill:
+        tensor-parallel-size: 2
+
+# Base only covers 1p-4d
+override_1p_tp4_3d:
+  name: "gb300-fp4-8k1k-mtp3-1p-tp4-3d-tp4"
+  resources:
+    decode_nodes: 3
+    decode_workers: 3

@@ -67,6 +67,7 @@ base:
         max-total-tokens: 32768
         chunked-prefill-size: 24576
         max-running-requests: 512
+        scheduler-recv-interval: 10
         enable-symm-mem: true
         load-balance-method: "round_robin"
         disaggregation-bootstrap-port: 30001
@@ -110,16 +111,8 @@ base:
     req_rate: "inf"
     concurrencies: "4x8x16x32x64"
 
-zip_override_1p_dep4:
-  name:
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp8"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4"
-  resources:
-    prefill_nodes: 1
-    prefill_workers: 1
-    decode_nodes:   [8, 4]
-  frontend:
-    num_additional_frontends: 3
+override_1p_dep4:
+  name: "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4"
   backend:
     sglang_config:
       prefill:
@@ -134,23 +127,12 @@ zip_override_1p_dep4:
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-      decode:
-        tensor-parallel-size: [8, 4]
-        data-parallel-size: 1
-        expert-parallel-size: 1
+        scheduler-recv-interval: 1
 
-zip_override_1p_dep4_experimental_a2a:
-  name:
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp8-experimental-a2a"
-    - "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4-experimental-a2a"
+override_1p_dep4_experimental_a2a:
+  name: "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4-experimental-a2a"
   model:
     container: "dev"
-  resources:
-    prefill_nodes: 1
-    prefill_workers: 1
-    decode_nodes:   [8, 4]
-  frontend:
-    num_additional_frontends: 3
   backend:
     sglang_config:
       prefill:
@@ -167,7 +149,4 @@ zip_override_1p_dep4_experimental_a2a:
         max-prefill-tokens: 524288
         chunked-prefill-size: 131072
         max-running-requests: 30000
-      decode:
-        tensor-parallel-size: [8, 4]
-        data-parallel-size: 1
-        expert-parallel-size: 1
+        scheduler-recv-interval: 1
