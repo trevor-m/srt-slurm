@@ -49,6 +49,7 @@ base:
     SGLANG_ENABLE_SPEC_V2: "1"
     SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
+    SGLANG_RADIX_FORCE_MISS: "1"
 
   backend:
     sglang_config:
@@ -56,8 +57,6 @@ base:
         disaggregation-mode: "prefill"
         served-model-name: "deepseek-ai/DeepSeek-R1"
         trust-remote-code: true
-        disable-radix-cache: true
-        disable-chunked-prefix-cache: true
         kv-cache-dtype: "fp8_e4m3"
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
@@ -83,8 +82,6 @@ base:
         disaggregation-mode: "decode"
         served-model-name: "deepseek-ai/DeepSeek-R1"
         trust-remote-code: true
-        disable-radix-cache: true
-        disable-chunked-prefix-cache: true
         kv-cache-dtype: "fp8_e4m3"
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
