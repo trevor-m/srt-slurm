@@ -57,7 +57,6 @@ base:
 
     decode_environment:
       SGLANG_MOE_NVFP4_DISPATCH: "1"
-      SGLANG_NCCL_ALL_GATHER_IN_OVERLAP_SCHEDULER_SYNC_BATCH: "1"
 
     sglang_config:
       prefill:
