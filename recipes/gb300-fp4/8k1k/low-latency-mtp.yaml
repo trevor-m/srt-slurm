@@ -47,6 +47,7 @@ base:
     SGLANG_NVFP4_CKPT_FP8_NEXTN_MOE: "1"
     SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK: "1024"
     SGLANG_RADIX_FORCE_MISS: "1"
+    UCX_TLS: "rc,dc,ud,cuda_copy,cuda_ipc,gdr_copy,tcp"
 
   backend:
     sglang_config:
