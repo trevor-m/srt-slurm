@@ -161,39 +161,15 @@ zip_override_dep32:
       - "128x256x512"
       - "256x512x1024"
 
-# dep16 mtp sweep for ctx10 (5 prefill nodes, 10 workers, 4 decode nodes, TP=16).
-# trtllm reference: ctx10-dep16 ~666 conc at mtp3.
-zip_override_ctx10_dep16_mtp:
+# dep16 variants at mtp2 only.
+# trtllm reference: ctx10-dep16 ~666 conc at mtp3. ctx13-dep16 ~1127 conc at mtp3.
+zip_override_dep16:
   name:
-    - "gb300-fp4-8k1k-mtp1-10p-dep2-1d-dep16"
     - "gb300-fp4-8k1k-mtp2-10p-dep2-1d-dep16"
-    - "gb300-fp4-8k1k-mtp3-10p-dep2-1d-dep16"
-  resources:
-    prefill_nodes: 5
-    prefill_workers: 10
-    decode_nodes: 4
-  backend:
-    sglang_config:
-      decode:
-        tensor-parallel-size: 16
-        data-parallel-size: 16
-        expert-parallel-size: 16
-        max-total-tokens: 2097152
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
-  benchmark:
-    concurrencies: "512x1024x2048"
-
-# dep16 mtp sweep for ctx13 (7 prefill nodes, 13 workers, 4 decode nodes, TP=16).
-# trtllm reference: ctx13-dep16 ~1127 conc at mtp3.
-zip_override_ctx13_dep16_mtp:
-  name:
-    - "gb300-fp4-8k1k-mtp1-13p-dep2-1d-dep16"
     - "gb300-fp4-8k1k-mtp2-13p-dep2-1d-dep16"
-    - "gb300-fp4-8k1k-mtp3-13p-dep2-1d-dep16"
   resources:
-    prefill_nodes: 7
-    prefill_workers: 13
+    prefill_nodes: [5, 7]
+    prefill_workers: [10, 13]
     decode_nodes: 4
   backend:
     sglang_config:
@@ -202,7 +178,9 @@ zip_override_ctx13_dep16_mtp:
         data-parallel-size: 16
         expert-parallel-size: 16
         max-total-tokens: 2097152
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
+        speculative-num-steps: 2
+        speculative-num-draft-tokens: 3
   benchmark:
-    concurrencies: "1024x2048"
+    concurrencies:
+     - "512x1024x2048"
+     - "1024x2048"

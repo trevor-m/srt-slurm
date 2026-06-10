@@ -160,13 +160,10 @@ zip_override_dep32:
       - "128x256x512"
       - "512x1024"
 
-# dep16 mtp sweep for ctx7 (7 prefill nodes, 7 workers, 4 decode nodes, TP=16).
+# dep16 ctx7 mtp2 (7 prefill nodes, 7 workers, 4 decode nodes, TP=16).
 # trtllm reference: ctx7-dep16 ~1229 conc at mtp1.
-zip_override_ctx7_dep16_mtp:
-  name:
-    - "gb200-fp4-8k1k-mtp1-7p-dep4-1d-dep16"
-    - "gb200-fp4-8k1k-mtp2-7p-dep4-1d-dep16"
-    - "gb200-fp4-8k1k-mtp3-7p-dep4-1d-dep16"
+override_ctx7_dep16_mtp2:
+  name: "gb200-fp4-8k1k-mtp2-7p-dep4-1d-dep16"
   resources:
     prefill_nodes: 7
     prefill_workers: 7
@@ -178,8 +175,8 @@ zip_override_ctx7_dep16_mtp:
         data-parallel-size: 16
         expert-parallel-size: 16
         max-total-tokens: 2097152
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
+        speculative-num-steps: 2
+        speculative-num-draft-tokens: 3
   benchmark:
     concurrencies: "512x1024x2048"
 
