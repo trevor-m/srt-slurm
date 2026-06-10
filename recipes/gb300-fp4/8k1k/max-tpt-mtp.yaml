@@ -1,7 +1,5 @@
 base:
   name: "gb300-fp4-8k1k-mtp"
-
-  slurm:
     partition: gb300
 
   dynamo:
