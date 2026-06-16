@@ -68,7 +68,7 @@ benchmark:
       --dataset-name random \
       --random-input-len 8192 --random-output-len 1024 \
       --num-prompts 32 --max-concurrency 1 \
-      --warmup-requests 64 --trust-remote-code
+      --warmup-requests 64
     # --- Speed: sglang.bench_serving, concurrency 16 ---
     python3 -m sglang.bench_serving \
       --backend sglang \
@@ -77,4 +77,4 @@ benchmark:
       --dataset-name random \
       --random-input-len 8192 --random-output-len 1024 \
       --num-prompts 32 --max-concurrency 16 \
-      --warmup-requests 64 --trust-remote-code
+      --warmup-requests 64
