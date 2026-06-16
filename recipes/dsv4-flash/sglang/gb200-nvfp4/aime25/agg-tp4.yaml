@@ -61,5 +61,6 @@ benchmark:
     REPEAT: "16"
     TEMPERATURE: "1.0"             # matches sgl-eval --temperature 1.0
     TOP_P: "1.0"                   # matches sgl-eval --top-p 1.0
+    NUM_THREADS: "8"               # client concurrency (single agg worker)
   command: |
     bash /configs/aime/run.sh
