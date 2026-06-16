@@ -1,0 +1,77 @@
+# DeepSeek-V4-Flash (NVFP4) GSM8K accuracy + speed on B300.
+#
+# Single aggregated worker, TP=4 over 1 node. Server flags taken from the
+# sglang deepseek-v4 cookbook (b300|flash|nvfp4|low-latency cell). Benchmark
+# runs GSM8K (sgl-eval) then sglang.bench_serving at concurrency 1 and 16, all in
+# the sglang server container via a type: custom command.
+name: "dsv4-flash-b300-nvfp4-gsm8k-agg-tp4"
+
+slurm:
+  time_limit: "4:00:00"
+
+model:
+  path: "dsv4-flash-nvfp4"          # cluster alias (srtslurm.yaml model_paths) -> mounted at /model
+  container: "lmsysorg/sglang:v0.5.13.post1-cu130"
+  precision: "nvfp4"
+
+frontend:
+  type: sglang
+
+resources:
+  gpu_type: "b300"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+
+backend:
+  type: sglang
+
+  aggregated_environment:
+    SGLANG_JIT_DEEPGEMM_PRECOMPILE: "0"
+
+  sglang_config:
+    aggregated:
+      served-model-name: "deepseek-ai/DeepSeek-V4-Flash"
+      trust-remote-code: true
+      tensor-parallel-size: 4
+      moe-runner-backend: "flashinfer_trtllm_routed"
+      speculative-algorithm: "EAGLE"
+      speculative-num-steps: 3
+      speculative-eagle-topk: 1
+      speculative-num-draft-tokens: 4
+      chunked-prefill-size: 4096
+      disable-flashinfer-autotune: true
+      swa-full-tokens-ratio: 0.1
+
+benchmark:
+  # type: custom runs in the sglang server container (default = model container),
+  # which provides sglang.bench_serving; sgl-eval is pip-installed at runtime.
+  # The in-job OpenAI frontend is on localhost:8000.
+  type: custom
+  env:
+    OPENAI_API_KEY: "EMPTY"        # sgl-eval/openai client requires it set; value unused
+  command: |
+    set -e
+    # --- Accuracy: GSM8K via sgl-eval ---
+    pip install git+https://github.com/sgl-project/sgl-eval
+    sgl-eval run gsm8k \
+      --base-url http://localhost:8000/v1 \
+      --num-threads 32
+    # --- Speed: sglang.bench_serving, concurrency 1 ---
+    python3 -m sglang.bench_serving \
+      --backend sglang \
+      --host localhost --port 8000 \
+      --model deepseek-ai/DeepSeek-V4-Flash \
+      --dataset-name random \
+      --random-input-len 8192 --random-output-len 1024 \
+      --num-prompts 32 --max-concurrency 1 \
+      --warmup-requests 64 --trust-remote-code
+    # --- Speed: sglang.bench_serving, concurrency 16 ---
+    python3 -m sglang.bench_serving \
+      --backend sglang \
+      --host localhost --port 8000 \
+      --model deepseek-ai/DeepSeek-V4-Flash \
+      --dataset-name random \
+      --random-input-len 8192 --random-output-len 1024 \
+      --num-prompts 32 --max-concurrency 16 \
+      --warmup-requests 64 --trust-remote-code
