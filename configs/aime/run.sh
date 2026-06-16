@@ -41,6 +41,7 @@ NUM_THREADS="${NUM_THREADS:-512}"
 TEMPERATURE="${TEMPERATURE:-1.0}"
 TOP_P="${TOP_P:-1.0}"
 SEED="${SEED:-42}"
+PARSE_REASONING="${PARSE_REASONING:-True}"
 OUTPUT_DIR="${OUTPUT_DIR:-/logs/accuracy/${DATASET}}"
 
 export OPENAI_API_KEY="${OPENAI_API_KEY:-EMPTY}"
@@ -55,6 +56,7 @@ echo "  num_threads: $NUM_THREADS"
 echo "  temperature: $TEMPERATURE"
 echo "  top_p:       $TOP_P"
 echo "  seed:        $SEED"
+echo "  parse_reasoning: $PARSE_REASONING"
 echo "  output_dir:  $OUTPUT_DIR"
 echo
 
@@ -76,6 +78,7 @@ ns eval \
   "++max_concurrent_requests=${NUM_THREADS}" \
   "++inference.temperature=${TEMPERATURE}" \
   "++inference.top_p=${TOP_P}" \
+  "++parse_reasoning=${PARSE_REASONING}" \
   "++inference.timeout=25000000"
 
 echo
