@@ -1,5 +1,6 @@
 base:
-  name: "gb200-fp4-8k1k-mtp"
+  # trtllm reference: ctx3-dep32 ~180 conc
+  name: "gb200-fp4-8k1k-mtp3-3p-dep4-1d-dep32"
 
   slurm:
     partition: gb200
@@ -145,21 +146,6 @@ base:
     req_rate: "inf"
     concurrencies: "128x256x512"
 
-# dep32 variants at mtp3 only.
-# trtllm reference: ctx3-dep32 ~180 conc, ctx8-dep32 ~666 conc.
-zip_override_dep32:
-  name:
-    - "gb200-fp4-8k1k-mtp3-3p-dep4-1d-dep32"
-    - "gb200-fp4-8k1k-mtp3-8p-dep4-1d-dep32"
-  resources:
-    prefill_nodes:   [3, 8]
-    prefill_workers: [3, 8]
-    decode_nodes:    [8, 8]
-  benchmark:
-    concurrencies:
-      - "128x256x512"
-      - "512x1024"
-
 # dep16 ctx7 mtp2 (7 prefill nodes, 7 workers, 4 decode nodes, TP=16).
 # trtllm reference: ctx7-dep16 ~1229 conc at mtp1.
 override_ctx7_dep16_mtp2:
@@ -180,13 +166,10 @@ override_ctx7_dep16_mtp2:
   benchmark:
     concurrencies: "512x1024x2048"
 
-# dep16 mtp sweep for ctx11 (11 prefill nodes, 11 workers, 4 decode nodes, TP=16).
+# dep16 ctx11 mtp2 (11 prefill nodes, 11 workers, 4 decode nodes, TP=16).
 # trtllm reference: ctx11-dep16 ~4301 conc at mtp1.
-zip_override_ctx11_dep16_mtp:
-  name:
-    - "gb200-fp4-8k1k-mtp1-11p-dep4-1d-dep16"
-    - "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16"
-    - "gb200-fp4-8k1k-mtp3-11p-dep4-1d-dep16"
+override_ctx11_dep16_mtp:
+  name: "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16"
   resources:
     prefill_nodes: 11
     prefill_workers: 11
@@ -198,7 +181,7 @@ zip_override_ctx11_dep16_mtp:
         data-parallel-size: 16
         expert-parallel-size: 16
         max-total-tokens: 2097152
-        speculative-num-steps:       [1, 2, 3]
-        speculative-num-draft-tokens: [2, 3, 4]
+        speculative-num-steps: 2
+        speculative-num-draft-tokens: 3
   benchmark:
     concurrencies: "1024x2048x4096"
