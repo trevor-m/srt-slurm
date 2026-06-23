@@ -185,3 +185,26 @@ override_ctx11_dep16_mtp:
         speculative-num-draft-tokens: 3
   benchmark:
     concurrencies: "1024x2048x4096"
+
+override_ctx11_dep16_mtp_experimental_a2a:
+  name: "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16-experimental-a2a"
+  model:
+    container: "dev"
+  resources:
+    prefill_nodes: 11
+    prefill_workers: 11
+    decode_nodes: 4
+  backend:
+    sglang_config:
+      prefill:
+        moe-a2a-backend: "flashinfer"
+        moe-runner-backend: "flashinfer_trtllm_routed"
+      decode:
+        tensor-parallel-size: 16
+        data-parallel-size: 16
+        expert-parallel-size: 16
+        max-total-tokens: 2097152
+        speculative-num-steps: 2
+        speculative-num-draft-tokens: 3
+  benchmark:
+    concurrencies: "1024x2048x4096"
