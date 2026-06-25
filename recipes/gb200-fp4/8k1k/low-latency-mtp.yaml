@@ -59,7 +59,7 @@ base:
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
         moe-runner-backend: "flashinfer_trtllm"
-        disable-flashinfer-autotune: true
+        #disable-flashinfer-autotune: true
         stream-interval: 50
         watchdog-timeout: 1000000
         context-length: 9600
@@ -85,7 +85,7 @@ base:
         attention-backend: "trtllm_mla"
         quantization: "modelopt_fp4"
         moe-runner-backend: "flashinfer_trtllm"
-        disable-flashinfer-autotune: true
+        #disable-flashinfer-autotune: true
         disaggregation-bootstrap-port: 30001
         stream-interval: 50
         watchdog-timeout: 1000000
@@ -113,6 +113,8 @@ base:
 
 override_1p_dep4:
   name: "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4"
+  model:
+    container: "dev"
   backend:
     sglang_config:
       prefill:
@@ -128,6 +130,7 @@ override_1p_dep4:
         chunked-prefill-size: 131072
         max-running-requests: 30000
         scheduler-recv-interval: 1
+
 
 override_1p_dep4_experimental_a2a:
   name: "gb200-fp4-8k1k-mtp3-1p-dep4-4d-tp4-experimental-a2a"

@@ -87,7 +87,7 @@ base:
         enable-dp-attention: true
         enable-dp-lm-head: true
         moe-dense-tp-size: 1
-        disable-flashinfer-autotune: true
+        #disable-flashinfer-autotune: true
 
         tensor-parallel-size: 4
         data-parallel-size: 4
@@ -170,6 +170,8 @@ override_ctx7_dep16_mtp2:
 # trtllm reference: ctx11-dep16 ~4301 conc at mtp1.
 override_ctx11_dep16_mtp:
   name: "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16"
+  model:
+    container: "dev"
   resources:
     prefill_nodes: 11
     prefill_workers: 11
@@ -187,7 +189,7 @@ override_ctx11_dep16_mtp:
     concurrencies: "1024x2048x4096"
 
 override_ctx11_dep16_mtp_experimental_a2a:
-  name: "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16-experimental-a2a"
+  name: "gb200-fp4-8k1k-mtp2-11p-dep4-1d-dep16-experimental-a2a-cutedsl"
   model:
     container: "dev"
   resources:
@@ -200,6 +202,8 @@ override_ctx11_dep16_mtp_experimental_a2a:
         moe-a2a-backend: "flashinfer"
         moe-runner-backend: "flashinfer_trtllm_routed"
       decode:
+        moe-a2a-backend: "flashinfer"
+        moe-runner-backend: "flashinfer_cutedsl"
         tensor-parallel-size: 16
         data-parallel-size: 16
         expert-parallel-size: 16
